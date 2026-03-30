@@ -5,12 +5,14 @@ import { supabase } from '../lib/supabase'
 import { fetchJobs, updateJobStatus, deleteJob } from '../lib/api'
 
 const COLUMNS = [
-  { id: 'saved',     label: 'Saved',     lightColor: 'bg-blue-50 border-blue-200',     darkColor: 'bg-blue-900/20 border-blue-800',     dot: 'bg-blue-500'   },
-  { id: 'applied',   label: 'Applied',   lightColor: 'bg-purple-50 border-purple-200', darkColor: 'bg-purple-900/20 border-purple-800', dot: 'bg-purple-500' },
-  { id: 'interview', label: 'Interview', lightColor: 'bg-amber-50 border-amber-200',   darkColor: 'bg-amber-900/20 border-amber-800',   dot: 'bg-amber-500'  },
-  { id: 'offer',     label: 'Offer',     lightColor: 'bg-green-50 border-green-200',   darkColor: 'bg-green-900/20 border-green-800',   dot: 'bg-green-500'  },
-  { id: 'rejected',  label: 'Rejected',  lightColor: 'bg-red-50 border-red-200',       darkColor: 'bg-red-900/20 border-red-800',       dot: 'bg-red-500'    },
+  { id: 'saved',     label: 'Saved',     lightColor: 'bg-blue-50 border-blue-200',     darkColor: 'bg-blue-900/20 border-blue-800',     dot: 'bg-blue-500',   hex: '#3b82f6' },
+  { id: 'applied',   label: 'Applied',   lightColor: 'bg-purple-50 border-purple-200', darkColor: 'bg-purple-900/20 border-purple-800', dot: 'bg-purple-500', hex: '#8b5cf6' },
+  { id: 'interview', label: 'Interview', lightColor: 'bg-amber-50 border-amber-200',   darkColor: 'bg-amber-900/20 border-amber-800',   dot: 'bg-amber-500',  hex: '#f59e0b' },
+  { id: 'offer',     label: 'Offer',     lightColor: 'bg-green-50 border-green-200',   darkColor: 'bg-green-900/20 border-green-800',   dot: 'bg-green-500',  hex: '#10b981' },
+  { id: 'rejected',  label: 'Rejected',  lightColor: 'bg-red-50 border-red-200',       darkColor: 'bg-red-900/20 border-red-800',       dot: 'bg-red-500',    hex: '#ef4444' },
 ]
+
+const SOURCE_COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#06b6d4', '#84cc16']
 
 const DATE_RANGES = [
   { label: 'All time', value: 0 },
@@ -19,7 +21,7 @@ const DATE_RANGES = [
   { label: 'Last 30 days', value: 30 },
 ]
 
-const PAGE_SIZE = 30
+const PAGE_SIZE = 15
 
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return ''
@@ -31,6 +33,50 @@ function formatDate(dateStr: string | null): string {
   if (diffDays < 7) return `${diffDays} days ago`
   if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+function PieChart({ data }: { data: { label: string; value: number; color: string }[] }) {
+  const total = data.reduce((s, d) => s + d.value, 0)
+  if (total === 0) return <div className="text-gray-400 text-sm text-center py-8">No data</div>
+
+  let cumulative = 0
+  const radius = 80
+  const cx = 100
+  const cy = 100
+
+  const slices = data.map(d => {
+    const startAngle = (cumulative / total) * 2 * Math.PI - Math.PI / 2
+    cumulative += d.value
+    const endAngle = (cumulative / total) * 2 * Math.PI - Math.PI / 2
+    const x1 = cx + radius * Math.cos(startAngle)
+    const y1 = cy + radius * Math.sin(startAngle)
+    const x2 = cx + radius * Math.cos(endAngle)
+    const y2 = cy + radius * Math.sin(endAngle)
+    const largeArc = endAngle - startAngle > Math.PI ? 1 : 0
+    return { ...d, path: `M ${cx} ${cy} L ${x1} ${y1} A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2} Z` }
+  })
+
+  return (
+    <div className="flex items-center gap-8 flex-wrap">
+      <svg width="200" height="200" viewBox="0 0 200 200">
+        {slices.map((s, i) => (
+          <path key={i} d={s.path} fill={s.color} stroke="white" strokeWidth="2">
+            <title>{s.label}: {s.value} ({Math.round((s.value / total) * 100)}%)</title>
+          </path>
+        ))}
+      </svg>
+      <div className="space-y-2">
+        {data.map((d, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: d.color }} />
+            <span className="text-sm text-gray-600 capitalize">{d.label}</span>
+            <span className="text-sm font-medium text-gray-800 ml-auto pl-4">{d.value}</span>
+            <span className="text-xs text-gray-400">({Math.round((d.value / total) * 100)}%)</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 type View = 'board' | 'table' | 'analytics'
@@ -48,14 +94,12 @@ export default function Dashboard() {
   const [notes, setNotes] = useState<Record<number, string>>({})
   const [pages, setPages] = useState<Record<string, number>>({})
 
-  // Filters
   const [search, setSearch] = useState('')
   const [sourceFilter, setSourceFilter] = useState('')
   const [locationFilter, setLocationFilter] = useState('')
   const [dateRange, setDateRange] = useState(0)
   const [sortNewest, setSortNewest] = useState(true)
 
-  // Add Job form
   const [newJob, setNewJob] = useState({ title: '', company: '', location: '', apply_link: '', source: 'other', status: 'applied' })
   const [adding, setAdding] = useState(false)
 
@@ -147,9 +191,12 @@ export default function Dashboard() {
   const clearFilters = () => { setSearch(''); setSourceFilter(''); setLocationFilter(''); setDateRange(0) }
 
   const statusCounts = COLUMNS.map(col => ({ ...col, count: jobs.filter(j => j.status === col.id).length }))
-  const sourceCounts = sources.map(s => ({ source: s, count: jobs.filter(j => j.source === s).length }))
+  const sourceCounts = sources.map((s, i) => ({
+    source: s,
+    count: jobs.filter(j => j.source === s).length,
+    color: SOURCE_COLORS[i % SOURCE_COLORS.length]
+  }))
 
-  // Dark mode helpers
   const bg = dark ? 'bg-gray-900' : 'bg-gray-50'
   const navBg = dark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
   const cardBg = dark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
@@ -224,7 +271,6 @@ export default function Dashboard() {
               </button>
             )}
           </>}
-          {/* View Toggle */}
           <div className={`flex rounded-lg border overflow-hidden ml-auto ${dark ? 'border-gray-600' : 'border-gray-200'}`}>
             {(['board', 'table', 'analytics'] as View[]).map(v => (
               <button key={v} onClick={() => setView(v)}
@@ -256,8 +302,7 @@ export default function Dashboard() {
                 </div>
                 <div className="flex flex-col gap-3">
                   {pageJobs.map(job => (
-                    <div key={job.id}
-                      onClick={() => setSelectedJob(job)}
+                    <div key={job.id} onClick={() => setSelectedJob(job)}
                       className={`${jobCardBg} rounded-xl p-4 shadow-sm hover:shadow-md transition cursor-pointer group`}>
                       <div className="flex items-start justify-between">
                         <div className="flex-1 min-w-0">
@@ -357,8 +402,10 @@ export default function Dashboard() {
 
       {/* Analytics View */}
       {view === 'analytics' && (
-        <div className="p-6 max-w-4xl mx-auto">
+        <div className="p-6 max-w-5xl mx-auto">
           <h2 className={`text-xl font-bold mb-6 ${textPrimary}`}>Application Analytics</h2>
+
+          {/* Status Cards */}
           <div className="grid grid-cols-5 gap-4 mb-8">
             {statusCounts.map(col => (
               <div key={col.id} className={`rounded-xl p-4 border ${dark ? col.darkColor : col.lightColor} text-center`}>
@@ -367,24 +414,28 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
+
+          {/* Total */}
           <div className={`rounded-xl p-4 mb-8 ${cardBg} border shadow-sm`}>
             <p className={`text-sm ${textSecondary}`}>Total jobs tracked</p>
             <p className={`text-4xl font-bold ${textPrimary}`}>{jobs.length}</p>
           </div>
-          <div className={`rounded-xl p-6 ${cardBg} border shadow-sm mb-8`}>
-            <h3 className={`font-semibold mb-4 ${textPrimary}`}>Jobs by Source</h3>
-            <div className="space-y-3">
-              {sourceCounts.map(s => (
-                <div key={s.source} className="flex items-center gap-3">
-                  <span className={`text-sm ${textSecondary} w-24 capitalize`}>{s.source}</span>
-                  <div className={`flex-1 ${dark ? 'bg-gray-700' : 'bg-gray-100'} rounded-full h-3`}>
-                    <div className="bg-blue-500 h-3 rounded-full" style={{ width: `${jobs.length ? (s.count / jobs.length) * 100 : 0}%` }} />
-                  </div>
-                  <span className={`text-sm ${textMuted} w-8 text-right`}>{s.count}</span>
-                </div>
-              ))}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            {/* Pie Chart — Source breakdown */}
+            <div className={`rounded-xl p-6 ${cardBg} border shadow-sm`}>
+              <h3 className={`font-semibold mb-4 ${textPrimary}`}>Jobs by Source</h3>
+              <PieChart data={sourceCounts.map(s => ({ label: s.source, value: s.count, color: s.color }))} />
+            </div>
+
+            {/* Pie Chart — Status breakdown */}
+            <div className={`rounded-xl p-6 ${cardBg} border shadow-sm`}>
+              <h3 className={`font-semibold mb-4 ${textPrimary}`}>Jobs by Status</h3>
+              <PieChart data={statusCounts.filter(c => c.count > 0).map(c => ({ label: c.label, value: c.count, color: c.hex }))} />
             </div>
           </div>
+
+          {/* Application Funnel */}
           <div className={`rounded-xl p-6 ${cardBg} border shadow-sm`}>
             <h3 className={`font-semibold mb-4 ${textPrimary}`}>Application Funnel</h3>
             <div className="space-y-3">
@@ -423,8 +474,7 @@ export default function Dashboard() {
               <div className="flex gap-3 flex-wrap">
                 <div>
                   <p className={`text-xs ${textMuted} mb-1`}>Status</p>
-                  <select value={selectedJob.status}
-                    onChange={e => handleStatusChange(selectedJob.id, e.target.value)}
+                  <select value={selectedJob.status} onChange={e => handleStatusChange(selectedJob.id, e.target.value)}
                     className={`text-sm border rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-300 ${dark ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-200 text-gray-700'}`}>
                     {COLUMNS.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
                   </select>
@@ -450,13 +500,11 @@ export default function Dashboard() {
               )}
               <div>
                 <p className={`text-xs font-medium ${textMuted} mb-2 uppercase tracking-wide`}>My Notes</p>
-                <textarea
-                  value={notes[selectedJob.id] || ''}
+                <textarea value={notes[selectedJob.id] || ''}
                   onChange={e => setNotes(prev => ({ ...prev, [selectedJob.id]: e.target.value }))}
                   placeholder="Add your personal notes here (interview prep, salary details, contacts...)"
                   rows={4}
-                  className={`w-full px-4 py-3 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none ${dark ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-200 text-gray-700 placeholder-gray-400'}`}
-                />
+                  className={`w-full px-4 py-3 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none ${dark ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-200 text-gray-700 placeholder-gray-400'}`} />
               </div>
             </div>
             <div className={`p-6 border-t ${dark ? 'border-gray-700' : 'border-gray-100'} flex gap-3`}>
