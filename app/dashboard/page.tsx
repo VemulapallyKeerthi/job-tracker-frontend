@@ -142,7 +142,6 @@ export default function Dashboard() {
     setDateRange(0)
   }
 
-  // Analytics data
   const statusCounts = COLUMNS.map(col => ({
     ...col,
     count: jobs.filter(j => j.status === col.id).length
@@ -163,27 +162,9 @@ export default function Dashboard() {
 
       {/* Navbar */}
       <nav className={`${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-b px-6 py-3 flex items-center justify-between sticky top-0 z-20 shadow-sm`}>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <span className="text-2xl">💼</span>
-            <h1 className="text-xl font-bold">JobTracker</h1>
-          </div>
-          {/* View Toggle */}
-          <div className={`flex rounded-lg border ${darkMode ? 'border-gray-600' : 'border-gray-200'} overflow-hidden`}>
-            {(['board', 'analytics', 'table'] as View[]).map(v => (
-              <button
-                key={v}
-                onClick={() => setView(v)}
-                className={`px-4 py-1.5 text-sm font-medium capitalize transition ${
-                  view === v
-                    ? 'bg-blue-500 text-white'
-                    : darkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                {v === 'board' ? '⊞ Board' : v === 'analytics' ? '📊 Analytics' : '☰ Table'}
-              </button>
-            ))}
-          </div>
+        <div className="flex items-center gap-2">
+          <span className="text-2xl">💼</span>
+          <h1 className="text-xl font-bold">JobTracker</h1>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -202,17 +183,20 @@ export default function Dashboard() {
         </div>
       </nav>
 
-      {/* Filters Bar — only for board and table views */}
-      {view !== 'analytics' && (
-        <div className={`px-6 py-3 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-b sticky top-14 z-10 shadow-sm`}>
-          <div className="flex flex-wrap gap-3 items-center">
-            <input
-              type="text"
-              placeholder="Search title or company..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className={`px-4 py-2 rounded-full border text-sm w-56 focus:outline-none focus:ring-2 focus:ring-blue-300 ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-200'}`}
-            />
+      {/* Filters Bar */}
+      <div className={`px-6 py-3 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-b sticky top-14 z-10 shadow-sm`}>
+        <div className="flex flex-wrap gap-3 items-center">
+          {/* Search */}
+          <input
+            type="text"
+            placeholder="Search title or company..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className={`px-4 py-2 rounded-full border text-sm w-56 focus:outline-none focus:ring-2 focus:ring-blue-300 ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-200'}`}
+          />
+
+          {/* Source filter */}
+          {view !== 'analytics' && (
             <select
               value={sourceFilter}
               onChange={e => setSourceFilter(e.target.value)}
@@ -223,6 +207,10 @@ export default function Dashboard() {
                 <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
               ))}
             </select>
+          )}
+
+          {/* Location filter */}
+          {view !== 'analytics' && (
             <select
               value={locationFilter}
               onChange={e => setLocationFilter(e.target.value)}
@@ -232,6 +220,10 @@ export default function Dashboard() {
               <option value="remote">Remote</option>
               <option value="onsite">On-site</option>
             </select>
+          )}
+
+          {/* Date range filter */}
+          {view !== 'analytics' && (
             <select
               value={dateRange}
               onChange={e => setDateRange(Number(e.target.value))}
@@ -241,6 +233,10 @@ export default function Dashboard() {
                 <option key={r.value} value={r.value}>{r.label}</option>
               ))}
             </select>
+          )}
+
+          {/* Sort newest */}
+          {view !== 'analytics' && (
             <button
               onClick={() => setSortNewest(!sortNewest)}
               className={`px-3 py-2 rounded-full border text-sm font-medium transition ${
@@ -249,14 +245,33 @@ export default function Dashboard() {
             >
               {sortNewest ? '↓ Newest' : '↕ Default'}
             </button>
-            {hasActiveFilters && (
-              <button onClick={clearFilters} className="px-3 py-2 rounded-full border border-red-200 text-red-500 text-sm hover:bg-red-50 transition">
-                ✕ Clear
+          )}
+
+          {/* Clear filters */}
+          {hasActiveFilters && view !== 'analytics' && (
+            <button onClick={clearFilters} className="px-3 py-2 rounded-full border border-red-200 text-red-500 text-sm hover:bg-red-50 transition">
+              ✕ Clear
+            </button>
+          )}
+
+          {/* View Toggle — right side */}
+          <div className={`flex rounded-lg border overflow-hidden ml-auto ${darkMode ? 'border-gray-600' : 'border-gray-200'}`}>
+            {(['board', 'table', 'analytics'] as View[]).map(v => (
+              <button
+                key={v}
+                onClick={() => setView(v)}
+                className={`px-4 py-1.5 text-sm font-medium transition ${
+                  view === v
+                    ? 'bg-blue-500 text-white'
+                    : darkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                {v === 'board' ? '⊞ Board' : v === 'table' ? '☰ Table' : '📊 Analytics'}
               </button>
-            )}
+            ))}
           </div>
         </div>
-      )}
+      </div>
 
       {/* Board View */}
       {view === 'board' && (
@@ -331,7 +346,7 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((job, i) => (
+                {filtered.map(job => (
                   <tr key={job.id} className={`border-t ${darkMode ? 'border-gray-700 hover:bg-gray-800' : 'border-gray-100 hover:bg-gray-50'} transition`}>
                     <td className="px-4 py-3 font-medium max-w-xs truncate">{job.title}</td>
                     <td className="px-4 py-3 text-gray-500">{job.company}</td>
@@ -373,8 +388,6 @@ export default function Dashboard() {
       {view === 'analytics' && (
         <div className="p-6 max-w-4xl mx-auto">
           <h2 className="text-xl font-bold mb-6">Application Analytics</h2>
-
-          {/* Status counts */}
           <div className="grid grid-cols-5 gap-4 mb-8">
             {statusCounts.map(col => (
               <div key={col.id} className={`rounded-xl p-4 border ${col.color} text-center`}>
@@ -383,14 +396,10 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
-
-          {/* Total */}
           <div className={`rounded-xl p-4 mb-8 ${darkMode ? 'bg-gray-800' : 'bg-white'} border shadow-sm`}>
             <p className="text-sm text-gray-500">Total jobs tracked</p>
             <p className="text-4xl font-bold">{jobs.length}</p>
           </div>
-
-          {/* Source breakdown */}
           <div className={`rounded-xl p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'} border shadow-sm mb-8`}>
             <h3 className="font-semibold mb-4">Jobs by Source</h3>
             <div className="space-y-3">
@@ -398,18 +407,13 @@ export default function Dashboard() {
                 <div key={s.source} className="flex items-center gap-3">
                   <span className="text-sm text-gray-600 w-24 capitalize">{s.source}</span>
                   <div className="flex-1 bg-gray-100 rounded-full h-3">
-                    <div
-                      className="bg-blue-500 h-3 rounded-full transition-all"
-                      style={{ width: `${jobs.length ? (s.count / jobs.length) * 100 : 0}%` }}
-                    />
+                    <div className="bg-blue-500 h-3 rounded-full" style={{ width: `${jobs.length ? (s.count / jobs.length) * 100 : 0}%` }} />
                   </div>
                   <span className="text-sm text-gray-500 w-8 text-right">{s.count}</span>
                 </div>
               ))}
             </div>
           </div>
-
-          {/* Application funnel */}
           <div className={`rounded-xl p-6 ${darkMode ? 'bg-gray-800' : 'bg-white'} border shadow-sm`}>
             <h3 className="font-semibold mb-4">Application Funnel</h3>
             <div className="space-y-3">
@@ -418,10 +422,7 @@ export default function Dashboard() {
                   <div className={`w-3 h-3 rounded-full ${col.dot}`} />
                   <span className="text-sm text-gray-600 w-24">{col.label}</span>
                   <div className="flex-1 bg-gray-100 rounded-full h-3">
-                    <div
-                      className={`${col.dot} h-3 rounded-full transition-all`}
-                      style={{ width: `${jobs.length ? (col.count / jobs.length) * 100 : 0}%` }}
-                    />
+                    <div className={`${col.dot} h-3 rounded-full`} style={{ width: `${jobs.length ? (col.count / jobs.length) * 100 : 0}%` }} />
                   </div>
                   <span className="text-sm text-gray-500 w-8 text-right">{col.count}</span>
                 </div>
