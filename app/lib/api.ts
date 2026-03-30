@@ -23,7 +23,7 @@ export async function fetchJobs(token: string, filters?: {
 
 export async function updateJobStatus(token: string, id: number, status: string) {
   const endpointMap: Record<string, string> = {
-    saved: `/jobs/${id}/status?status=saved`,
+    saved: `/jobs/${id}/status?status=saved`,  // ← query param
     applied: `/jobs/${id}/apply`,
     interview: `/jobs/${id}/interview`,
     offer: `/jobs/${id}/offer`,
@@ -38,7 +38,7 @@ export async function updateJobStatus(token: string, id: number, status: string)
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
-    
+    // No body needed for saved anymore
   })
   if (!res.ok) throw new Error('Failed to update job status')
   return res.json()
